@@ -1,43 +1,55 @@
 #!/bin/bash
 
-sudo rpm --import https://yum.corretto.aws/corretto.key
-sudo curl -L -o /etc/yum.repos.d/corretto.repo https://yum.corretto.aws/corretto.repo
+# Install dependencies
+sudo yum update -y
+sudo yum install -y wget java-17-openjdk
 
-sudo yum install -y java-17-amazon-corretto-devel wget -y
+# Setup variables
+NEXUS_VERSION="3.77.1-01"
+NEXUS_DIR="nexus-${NEXUS_VERSION}"
+NEXUS_TAR="${NEXUS_DIR}-unix.tar.gz"
+NEXUS_URL="https://download.sonatype.com/nexus/3/${NEXUS_TAR}"
 
-mkdir -p /opt/nexus/   
-mkdir -p /tmp/nexus/                           
-cd /tmp/nexus/
-NEXUSURL="https://download.sonatype.com/nexus/3/latest-unix.tar.gz"
-wget $NEXUSURL -O nexus.tar.gz
-sleep 10
-EXTOUT=`tar xzvf nexus.tar.gz`
-NEXUSDIR=`echo $EXTOUT | cut -d '/' -f1`
-sleep 5
-rm -rf /tmp/nexus/nexus.tar.gz
-cp -r /tmp/nexus/* /opt/nexus/
-sleep 5
-useradd nexus
-chown -R nexus.nexus /opt/nexus 
-cat <<EOT>> /etc/systemd/system/nexus.service
-[Unit]                                                                          
-Description=nexus service                                                       
-After=network.target                                                            
-                                                                  
-[Service]                                                                       
-Type=forking                                                                    
-LimitNOFILE=65536                                                               
-ExecStart=/opt/nexus/$NEXUSDIR/bin/nexus start                                  
-ExecStop=/opt/nexus/$NEXUSDIR/bin/nexus stop                                    
-User=nexus                                                                      
-Restart=on-abort                                                                
-                                                                  
-[Install]                                                                       
-WantedBy=multi-user.target                                                      
+# Create directories
+mkdir -p /opt/nexus/
+cd /tmp
+rm -rf /tmp/nexus-install && mkdir /tmp/nexus-install
+cd /tmp/nexus-install
 
+# Download and extract Nexus
+wget "$NEXUS_URL" -O nexus.tar.gz
+tar -xzf nexus.tar.gz
+mv "$NEXUS_DIR" /opt/nexus
+
+# Create nexus user if not exists
+id -u nexus &>/dev/null || sudo useradd -r -M -s /sbin/nologin nexus
+
+# Set permissions
+chown -R nexus:nexus /opt/nexus
+
+# Configure nexus.rc
+echo 'run_as_user="nexus"' | tee /opt/nexus/$NEXUS_DIR/bin/nexus.rc
+
+# Create systemd service
+cat <<EOT > /etc/systemd/system/nexus.service
+[Unit]
+Description=Nexus Repository Manager
+After=network.target
+
+[Service]
+Type=forking
+LimitNOFILE=65536
+ExecStart=/opt/nexus/$NEXUS_DIR/bin/nexus start
+ExecStop=/opt/nexus/$NEXUS_DIR/bin/nexus stop
+User=nexus
+Restart=on-abort
+
+[Install]
+WantedBy=multi-user.target
 EOT
 
-echo 'run_as_user="nexus"' > /opt/nexus/$NEXUSDIR/bin/nexus.rc
+# Enable and start Nexus
 systemctl daemon-reload
-systemctl start nexus
 systemctl enable nexus
+systemctl start nexus
+
