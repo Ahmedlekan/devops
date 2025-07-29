@@ -6,7 +6,7 @@ FROM maven:3.9.9-eclipse-temurin-21 AS builder
 WORKDIR /app
 
 # Clone only the required branch directly (best practice)
-RUN git clone --branch containers --single-branch https://github.com/Ahmedlekan/devops-project.git
+RUN git clone --branch docker --single-branch https://github.com/Ahmedlekan/devops.git
 
 WORKDIR /app/devops-project
 
