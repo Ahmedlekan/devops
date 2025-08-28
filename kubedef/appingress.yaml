@@ -8,7 +8,7 @@ metadata:
 spec:
   ingressClassName: nginx
   rules:
-  - host: lekan.xyz
+  - host: animalskoala.com
     http:
       paths:
       - path: /
